@@ -6,6 +6,7 @@ import {
   SignedOut,
   UserButton,
 } from "@clerk/nextjs";
+import Link from "next/link";
 import type { AppProps } from "next/app";
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -18,19 +19,19 @@ export default function App({ Component, pageProps }: AppProps) {
     >
       <div className="min-h-screen bg-[color:var(--background)] text-[color:var(--foreground)]">
         <header className="flex items-center justify-between border-b border-[color:var(--color-granite)]/30 bg-[color:var(--color-imperial-blue)] px-6 py-4 text-white">
-          <a className="text-lg font-semibold tracking-tight" href="/">
+          <Link className="text-lg font-semibold tracking-tight" href="/">
             Dragonfire Games
-          </a>
+          </Link>
           <nav className="flex items-center gap-4 text-sm font-medium">
-            <a href="/about" className="hover:underline">
+            <Link href="/about" className="hover:underline">
               About
-            </a>
-            <a href="/events" className="hover:underline">
+            </Link>
+            <Link href="/events" className="hover:underline">
               Events
-            </a>
-            <a href="/admin" className="hover:underline">
+            </Link>
+            <Link href="/admin/events" className="hover:underline">
               Admin
-            </a>
+            </Link>
             <SignedOut>
               <SignInButton />
             </SignedOut>

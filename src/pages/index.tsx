@@ -1,4 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,18 +30,18 @@ export default function Home() {
             and the staff workflow simple.
           </p>
           <div className="mt-6 flex flex-col gap-3 text-sm font-medium sm:flex-row">
-            <a
+            <Link
               className="inline-flex items-center justify-center rounded-full bg-[color:var(--color-imperial-blue)] px-5 py-3 text-white shadow-sm transition hover:bg-[color:var(--color-granite)]"
               href="/events"
             >
               See events
-            </a>
-            <a
+            </Link>
+            <Link
               className="inline-flex items-center justify-center rounded-full border border-[color:var(--color-granite)]/30 px-5 py-3 text-[color:var(--color-granite)] transition hover:border-[color:var(--color-imperial-blue)]/50 hover:text-[color:var(--color-imperial-blue)]"
               href="/card-requests"
             >
               Request cards
-            </a>
+            </Link>
           </div>
         </section>
 

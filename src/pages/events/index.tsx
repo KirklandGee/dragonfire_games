@@ -1,7 +1,8 @@
 import Head from "next/head";
-import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { GetServerSideProps } from "next";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
 import type { Event } from "@/types/events";
@@ -47,22 +48,55 @@ export const getServerSideProps: GetServerSideProps<EventsPageProps> = async () 
   return { props: { events: data ?? [], error: null } };
 };
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(value));
-
-const formatTime = (value: string) =>
-  new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+type TimeFilter = "all" | "next7" | "next30";
 
 export default function EventsPage({ events, error }: EventsPageProps) {
-  const weekly = events.filter((evt) => evt.event_type === "weekly");
-  const special = events.filter((evt) => evt.event_type !== "weekly");
+  const [search, setSearch] = useState("");
+  const [game, setGame] = useState<string>("all");
+  const [eventType, setEventType] = useState<Event["event_type"] | "all">("all");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+
+  const gameOptions = useMemo(() => {
+    const set = new Set<string>();
+    events.forEach((evt) => evt.game_tags?.forEach((tag) => set.add(tag)));
+    return Array.from(set).sort();
+  }, [events]);
+
+  const filtered = useMemo(() => {
+    const now = new Date();
+    const limitDate =
+      timeFilter === "next7"
+        ? addDays(now, 7)
+        : timeFilter === "next30"
+          ? addDays(now, 30)
+          : null;
+
+    return events.filter((evt) => {
+      const term = search.trim().toLowerCase();
+      if (term) {
+        const haystack = `${evt.title} ${evt.description ?? ""}`.toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      if (game !== "all") {
+        if (!evt.game_tags || !evt.game_tags.includes(game)) return false;
+      }
+      if (eventType !== "all" && evt.event_type !== eventType) return false;
+
+      if (limitDate) {
+        const start = new Date(evt.start_datetime);
+        if (start < now || start > limitDate) return false;
+      }
+
+      return true;
+    });
+  }, [events, search, game, eventType, timeFilter]);
+
+  const resetFilters = () => {
+    setSearch("");
+    setGame("all");
+    setEventType("all");
+    setTimeFilter("all");
+  };
 
   return (
     <div
@@ -81,10 +115,10 @@ export default function EventsPage({ events, error }: EventsPageProps) {
             Events
           </p>
           <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
-            What&apos;s happening this week
+            What&apos;s happening
           </h1>
           <p className="text-base text-[color:var(--color-granite)]">
-            Clear times, clear formats. No digging for info.
+            Filter by game, type, or date range. Tap an event for details.
           </p>
         </header>
 
@@ -94,90 +128,148 @@ export default function EventsPage({ events, error }: EventsPageProps) {
           </div>
         ) : null}
 
-        <div className="grid gap-8">
-          <Section title="Weekly staples" items={weekly} />
-          <Section title="Special events" items={special} />
-        </div>
+        <section className="rounded-2xl border border-[color:var(--color-granite)]/25 bg-white/90 p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+            <label className="flex flex-col gap-1 text-sm font-semibold text-[color:var(--color-charcoal-brown)]">
+              Search
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Event name or description"
+                className="rounded-lg border border-[color:var(--color-granite)]/30 px-3 py-2 text-sm text-[color:var(--color-charcoal-brown)] shadow-inner"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-semibold text-[color:var(--color-charcoal-brown)]">
+              Game
+              <select
+                value={game}
+                onChange={(e) => setGame(e.target.value)}
+                className="rounded-lg border border-[color:var(--color-granite)]/30 px-3 py-2 text-sm text-[color:var(--color-charcoal-brown)] shadow-inner"
+              >
+                <option value="all">All games</option>
+                {gameOptions.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-semibold text-[color:var(--color-charcoal-brown)]">
+              Type
+              <select
+                value={eventType}
+                onChange={(e) =>
+                  setEventType(e.target.value as Event["event_type"] | "all")
+                }
+                className="rounded-lg border border-[color:var(--color-granite)]/30 px-3 py-2 text-sm text-[color:var(--color-charcoal-brown)] shadow-inner"
+              >
+                <option value="all">All types</option>
+                <option value="weekly">Weekly</option>
+                <option value="one-time">One-time</option>
+                <option value="tournament">Tournament</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-semibold text-[color:var(--color-charcoal-brown)]">
+              Date range
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+                className="rounded-lg border border-[color:var(--color-granite)]/30 px-3 py-2 text-sm text-[color:var(--color-charcoal-brown)] shadow-inner"
+              >
+                <option value="all">All upcoming</option>
+                <option value="next7">Next 7 days</option>
+                <option value="next30">Next 30 days</option>
+              </select>
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[color:var(--color-granite)]">
+            <span>
+              Showing {filtered.length} of {events.length} events
+            </span>
+            <button
+              onClick={resetFilters}
+              className="rounded-full border border-[color:var(--color-granite)]/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:var(--color-imperial-blue)] hover:border-[color:var(--color-imperial-blue)]/60"
+            >
+              Clear filters
+            </button>
+          </div>
+        </section>
+
+        <EventsList events={filtered} />
       </main>
     </div>
   );
 }
 
-function Section({ title, items }: { title: string; items: Event[] }) {
-  if (!items.length) {
+function EventsList({ events }: { events: Event[] }) {
+  if (!events.length) {
     return (
-      <section className="rounded-2xl border border-[color:var(--color-granite)]/20 bg-white/70 p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-[color:var(--color-charcoal-brown)]">
-          {title}
-        </h2>
-        <p className="mt-2 text-sm text-[color:var(--color-granite)]">
-          Nothing scheduled here yet.
-        </p>
-      </section>
+      <div className="rounded-2xl border border-[color:var(--color-granite)]/25 bg-white/80 p-6 text-[color:var(--color-granite)] shadow-sm">
+        No events match these filters.
+      </div>
     );
   }
 
   return (
-    <section className="rounded-2xl border border-[color:var(--color-granite)]/20 bg-white/70 p-6 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold text-[color:var(--color-charcoal-brown)]">
-          {title}
-        </h2>
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--color-imperial-blue)]">
-          {items.length} event{items.length === 1 ? "" : "s"}
-        </span>
-      </div>
-      <div className="mt-4 space-y-3">
-        {items.map((event) => (
-          <Link
-            key={event.id}
-            href={`/events/${event.id}`}
-            className="flex flex-col gap-2 rounded-xl border border-[color:var(--color-granite)]/15 bg-white/80 p-4 transition hover:-translate-y-[2px] hover:shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[color:var(--color-granite)]">
-                  {formatDate(event.start_datetime)} · {formatTime(event.start_datetime)}
-                </p>
-                <h3 className="mt-1 text-lg font-semibold text-[color:var(--color-charcoal-brown)]">
-                  {event.title}
-                </h3>
-              </div>
-              <Badge>{event.event_type.replace("-", " ")}</Badge>
+    <div className="space-y-4">
+      {events.map((event) => (
+        <Link
+          key={event.id}
+          href={`/events/${event.id}`}
+          className="flex flex-col gap-2 rounded-2xl border border-[color:var(--color-granite)]/20 bg-white/85 p-4 shadow-sm transition hover:-translate-y-[2px] hover:shadow-md"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="rounded-full bg-[color:var(--color-imperial-blue)]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--color-imperial-blue)]">
+                {event.event_type}
+              </span>
+              {event.game_tags?.length ? (
+                <span className="text-xs font-semibold text-[color:var(--color-granite)]">
+                  {event.game_tags.join(", ")}
+                </span>
+              ) : null}
             </div>
-            {event.description ? (
-              <p className="text-sm text-[color:var(--color-granite)]">
-                {event.description}
-              </p>
-            ) : null}
-            {event.game_tags?.length ? (
-              <div className="flex flex-wrap gap-2">
-                {event.game_tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-[color:var(--color-aquamarine)]/30 px-3 py-1 text-xs font-semibold text-[color:var(--color-granite)]"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
             {event.entry_fee ? (
-              <p className="text-xs font-semibold text-[color:var(--color-imperial-blue)]">
+              <span className="text-xs font-semibold text-[color:var(--color-granite)]">
                 Entry: {event.entry_fee}
-              </p>
+              </span>
             ) : null}
-          </Link>
-        ))}
-      </div>
-    </section>
+          </div>
+          <h2 className="text-xl font-semibold text-[color:var(--color-charcoal-brown)]">
+            {event.title}
+          </h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--color-granite)]">
+            {formatDate(event.start_datetime)} · {formatTime(event.start_datetime)}
+          </p>
+          {event.description ? (
+            <p className="text-sm text-[color:var(--color-granite)]">{event.description}</p>
+          ) : null}
+          {event.registration_link ? (
+            <span className="text-xs font-semibold text-[color:var(--color-imperial-blue)]">
+              Registration available
+            </span>
+          ) : null}
+        </Link>
+      ))}
+    </div>
   );
 }
 
-function Badge({ children }: { children: string }) {
-  return (
-    <span className="rounded-full bg-[color:var(--color-imperial-blue)]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--color-imperial-blue)]">
-      {children}
-    </span>
-  );
+function addDays(date: Date, days: number) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
 }
+
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
+
+const formatTime = (value: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));

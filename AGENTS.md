@@ -12,6 +12,7 @@
 - Clerk for admin authentication; protect `/admin/*` via middleware.
 - Deploy on Vercel; use API routes for server logic.
 - Path alias `@/*` -> `src/*`.
+- Admin ACL: temporary allowlist via `CLERK_ADMIN_USER_IDS`; replace with proper Clerk roles/permissions later.
 
 ## Auth Notes
 - Clerk pages-router setup with `ClerkProvider` in `_app.tsx`.
